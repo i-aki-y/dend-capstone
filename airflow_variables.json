@@ -1,0 +1,21 @@
+{
+  "aws_region": "us-west-2",
+	"s3_bucket": ${PROJECT_S3_BUCKET},
+  "ml_data_path": "ml-latest-201908",
+  "tmdb_data_path": "tmdb-data",
+  "movielens_zip_url": "http://files.grouplens.org/datasets/movielens/ml-latest.zip",
+  "local_tmp_dir": ${LOCAL_DIR},
+  "pg_config": {
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "",
+    "host": "localhost",
+    "port": "5432"
+  },
+  "tmdb_api_key": ${TMDB_API_KEY},
+  "key_pair": ${AWS_KEY_PAIR},
+  "subnet_id": ${AWS_PROJECT_SUBNET_ID},
+  "emr_release_label": "emr-5.26.0",
+  "emr_log_url": ${EMR_LOG_S3__URL},
+  "emr_bootstrap_action": ${EMR_BOOTSTRAP_ACTION_SCRIPT_S3_URL}
+}
