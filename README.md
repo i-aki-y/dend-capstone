@@ -12,19 +12,23 @@ In this project, I think of two usecases for this data model. One is a creating 
 
 This project contains the following steps:
 
-1. Collect TMDB data through the TMBD API
+1. Collect TMDB data from the API
 2. Upload collected data to S3
 3. Upload MovieLens dataset to S3
 4. Combine MovieLens and TMDB dataset using Apache Spark
 5. Save processed data to S3
+6. Collect TMDB data change set.
+7. Update the result dataset.
+
+From 1 to 5 steps should be executed only one time, and the 6 and 7 steps are executed daily.
 
 ### 1. Collect TMDB data through the TMBD API
 
-Movie data in the TMDB is provided through the API.
+Movie data in the TMDB is provided with API.
 Since the API returns a single movie data from a request.
-I should collect movie data using successive api calls.
+I should collect movie data using successive API calls.
 
-We can get latest movie list from `http://files.tmdb.org/p/exports/` endpoint[^tmdbex]. Since the TMDB have over the 480K movie data and API call is limited 40 request per 10 second, it takes 1.5 days ($1.5 \approx 480K/(24*3600*4)$) to obtain all movie data. The returned data stored temporarily local database.
+We can get the latest movie list from `http://files.tmdb.org/p/exports/` endpoint[^tmbdex]. Since the TMDB have over the 480K movie data and the API call is limited 40 requests per 10 seconds, it takes 1.5 days ($1.5 \approx 480K/(24*3600*4)$) to obtain all movie data. The returned data stored temporarily local database.
 
 ### 2. Upload collected data to S3
 
@@ -45,15 +49,54 @@ In order to parse TMDB's json data, I use apache spark [^spark]. I create spark 
 
 Processed data are saved in Parquet format in S3[^parquet].
 
-## Reference
+### 6. Collect TMDB data change set
 
-[^tmdb]: https://www.themoviedb.org
-[^imdb]: https://www.imdb.com
-[^movielens]: https://grouplens.org/datasets/movielens/
-[^tmbdex]: https://developers.themoviedb.org/3/getting-started/daily-file-exports
-[^spark]: https://spark.apache.org
-[^emr]: https://docs.aws.amazon.com/ja_jp/emr/latest/ManagementGuide/emr-overview.html
-[^parquet]: https://parquet.apache.org
+Although MovieLens data does not update frequently, TMDB's dataset is constantly updated.
+In this step, the changes of TMDB's dataset are obtained from the API.
+
+### 7. Update the result dataset
+
+We merge the change set to our result dataset.
+
+## Contents
+
+This project contains the following files
+
+- `README.md`: This file. This contains the description of the project and usage.
+- `airflow_variables.json `: This defines the airflow variables which are used in this project. This file includes some *place holders* which should appropriately be replaced according to your environment. You can import this file from the airflow web interface by the following steps: Select menus `Admin` > `Variable`, and click `Import Variables`.
+- `imgs/*`: Supplementary materials used in `README.md`.
+- `dag/*.py` : These are definitions of airflow dags.
+- `plugins/helpers/scripts.py`: In this file, there are some definitions of shell scripts in which we setup EMR cluster and control the steps.
+- `plugins/operators/*.py`: These files defines airflow's custom operators.
+
+## Airflow pipeline
+
+### run airflow
+
+This project is implemented as a airflow pipeline.
+After the setup the airflow[^airflow_setup], you should run the following command.
+
+```
+$ airflow webservar
+$ airflow scheduler
+```
+
+Edit the following variables in the `${AIRFLOW_HOME}/airflow.cfg`.
+
+```
+dags_folder = ${PROJECT_ROOT}/dag
+plugins_folder = ${PROJECT_ROOT}/plugins
+```
+The `${PROJECT_ROOT}` is correspond to the directory which contains this `README.md`.
+
+### DAG description
+
+In this project, I defined the following pipelines.
+
+- `prepare_movielens_dag`: This dag download the latest MovieLens data and upload the data to the S3.
+- `prepare_tmdb_dag`: This dag collect TMDB data from the TMBD API and upload the data to the S3.
+- `process_all_data`: This dag setup aws EMR cluster and runs etl process by using spark.
+- `update_movie_dataset`: This dag collect daily changeset from TMDB API and merge it to the latest result dataset by using the EMR cluster.
 
 ## Scenarios
 
@@ -64,7 +107,6 @@ split multiple files and can be uploaded to S3. The S3 is capable for very large
 
 ### "the pipelines would be run on a daily basis by 7 am every day."
 
-Although the MovieLens dataset does not update frequently, TMDB's dataset is constantly updated.
 In order to collect the whole TMDB's movie data, it takes 1.5 days. But once we got the data, TMDB provide `/movie/changes` API which returns a list of movie ids that have changed in past 24 hours.
 The list looks have $\sim 2k$ items. When we request movie data 3 items per second, we can collect the changed movie list in 2 hours.
 In this pipe line, the changed movie list will be uploaded S3 as a update file. And before the etl process, this update file will be merged with the current raw dataset. So we can complete the pipe line in daily bases.
@@ -74,8 +116,6 @@ In this pipe line, the changed movie list will be uploaded S3 as a update file. 
 The resulted data are stored in S3 of AWS. The datamodel is made for data analysis which is read intensive usecase. S3 is capable for 5,500 requests per second[^s3spec].
 In this pipeline, I use AWS EMR with Jupyterhub as a Spark environment. The Jupyterhub serves jupyter notebook for multiple users. With this configuration, I think the data model can be available for 100+ people.
 
-[^s3spec]: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
-[^jupyhub]: https://jupyterhub.readthedocs.io/en/stable/
 
 ## Data quality check
 
@@ -126,8 +166,22 @@ The diagram depicts only a few items for simplicity.
 
 ### Input data
 
-![RawData](./ER_RawData.png)
+![RawData](./imgs/ER_RawData.png)
 
 ### Output data
 
-![ResultData](./ER_ResultData.png)
+![ResultData](./imgs/ER_ResultData.png)
+
+
+## references
+
+[^tmdb]: https://www.themoviedb.org
+[^imdb]: https://www.imdb.com
+[^movielens]: https://grouplens.org/datasets/movielens/
+[^tmbdex]: https://developers.themoviedb.org/3/getting-started/daily-file-exports
+[^spark]: https://spark.apache.org
+[^emr]: https://docs.aws.amazon.com/ja_jp/emr/latest/ManagementGuide/emr-overview.html
+[^parquet]: https://parquet.apache.org
+[^airflow_setup]:https://airflow.apache.org/installation.html
+[^s3spec]: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
+[^jupyhub]: https://jupyterhub.readthedocs.io/en/stable/
