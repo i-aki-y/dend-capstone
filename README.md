@@ -68,6 +68,8 @@ This project contains the following files
 - `dag/*.py` : These are definitions of airflow dags.
 - `plugins/helpers/scripts.py`: In this file, there are some definitions of shell scripts in which we setup EMR cluster and control the steps.
 - `plugins/operators/*.py`: These files defines airflow's custom operators.
+- `emr/emr_bootstrap.sh`: This is a bootstrap script which is used when the EMR cluster is setup. In order to run cluster set script, you should upload this script to the S3 where the EMR process can access.
+
 
 ## Airflow pipeline
 
