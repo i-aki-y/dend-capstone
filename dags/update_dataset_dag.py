@@ -36,8 +36,8 @@ default_args = {
 dag = DAG('update_movie_dataset',
           default_args=default_args,
           description='get tmdb changes and run spark jobs',
-          #schedule_interval="0 6 * * *"
-          schedule_interval=None
+          schedule_interval="0 6 * * *"
+          #schedule_interval=None
         )
 
 
