@@ -4,9 +4,11 @@ In this project, I will provide an data model where users can analyze movie revi
 We can access several open movie data across the world [^tmdb][^imdb][^movielens].
 While these data can be used for research of recommendation or text analysis, each dataset have own advantage and disadvantage.
 For example Movie Lens is a famous dataset which contains many anonymized user ratings about movies. But the dataset have little data about movie's features such as actors or revenue.
-TMDB is another movie dataset which contains details of movie data. Since movie lens's dataset provide `link.csv` which contains references to other public dataset such as TMDB or IMDB, we can combin these dataset into the single data model which enhances the analysis process. So in this project I will make a pipe line which combines different movie dataset to a single data model.
+TMDB is another movie dataset which contains details of movie data. Since movie lens's dataset provide `link.csv` which contains references to other public dataset such as TMDB or IMDB, we can combine these dataset into the single data model which enhances the analysis process. So in this project I will make a pipe line which combines different movie dataset to a single data model.
 
-In this project, I think of two usecases for this data model. One is a creating recommendation model. This is a main purpose of Movie Lens dataset. Another usecase is a search index. Fulltext search is ubiquitous
+In this project, I think of two usecases for this data model. One is a creating recommendation model. This is a main purpose of Movie Lens dataset. Another usecase is a search index. Fulltext search is ubiquitous around many services.
+
+Note that the scope of this project is to prepare the well arranged dataset. Therefore this project does not have any recommendation and indexing logics.
 
 ## Steps of the project
 
@@ -69,7 +71,7 @@ This project contains the following files
 - `plugins/helpers/scripts.py`: In this file, there are some definitions of shell scripts in which we setup EMR cluster and control the steps.
 - `plugins/operators/*.py`: These files defines airflow's custom operators.
 - `emr/emr_bootstrap.sh`: This is a bootstrap script which is used when the EMR cluster is setup. In order to run cluster set script, you should upload this script to the S3 where the EMR process can access.
-
+- `emr/etl.py`: This is a ETL script which is executed on the EMR cluster.
 
 ## Airflow pipeline
 
@@ -121,19 +123,15 @@ In this pipeline, I use AWS EMR with Jupyterhub as a Spark environment. The Jupy
 
 ## Data quality check
 
-- Check that the same movie are appropriately combined
+- Check that the same movie are appropriately joined
 
-MovieLens data movie and TMDB movie have same movie title
+I checked that sampled MovieLens data movie and TMDB movie have same movie title.
+See, `emr/check_movie_mapping.py`
 
 - Check all data not empty
 
 Check the resulted data have non zero data.
-
-### TMDB API
-
-In order to get TMDB data, you should create get API key.
-
-## Data schema
+See, `emr/check_count.py`
 
 ## About Dataset
 
@@ -141,6 +139,18 @@ As source of data, I use the following dataset.
 
 - MovieLens
 - The Movie DataBase
+
+### Data format
+
+Two data format are used.
+CSV: Dataset of MovieLens are provided as CSV.
+API: TMDB data are provided by API.
+
+### Number of data
+
+MovieLens's `rating.csv` have 27,753,445 lines.
+
+## Dataset details
 
 ### MovieLens
 
@@ -159,6 +169,48 @@ I collect the following information from the API.
 - movies
 - keywords
 - reviews
+
+### Dataset dictionary
+
+The result dataset are stored in S3 bucket as csv files.
+The `movies.csv`, `rating.csv` and `rating_time.csv` are assumed to use develope recommendation model.
+The `movie_for_search.csv` is assumed to create search index.
+
+- movies : Movie dimension table 
+  - ml_movie_id: movie lens's movie ID
+  - tmdb_movie_id: tmdb movie ID
+  - ml_genre: movie lens's genre
+  - release_year: movie's release year
+  - release_month: movie's release month
+  - release_day: movie's release day
+  - budget: movie's budget
+  - revenue: movie's revenue
+  - title: movie's title
+  - vote_average: tmdb's vote average
+  - vote_count: tmdb's vote count
+
+- rating : Fact table
+  - user_id: movie lens's user ID
+  - ml_movie_id: movie lens's movie ID
+  - timestamp: timestamp when the user rating the movie.
+  - rating: rating score
+
+- rating_time : Timestamp dimension table
+  - timestamp: timestamp when the user rating the movie.
+  - year: year of the timestamp 
+  - month: month of the timestamp 
+  - day: day of the timestamp 
+  - hour: hour of the timestamp 
+  - week: week of the timestamp 
+  - weekday: weekday of the timestamp 
+
+- movie_for_search : For search index
+  - tmdb_id: tmdb's movie ID
+  - title: movie tile
+  - keyword: keyword which related to the movie defined in TMDB
+  - tagline: movie's tagline
+  - overview: movie's overview
+
 
 ## ER Diagram
 
